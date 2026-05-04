@@ -1,7 +1,7 @@
 export default async function handler(req, res) {
   const allowedOrigins = [
     "https://socroom.com",
-    "https://www.socroom.com" 
+    "https://www.socroom.com"
   ];
 
   const origin = req.headers.origin;
@@ -62,14 +62,10 @@ Your job:
 2. Keep answers simple, professional, and helpful.
 3. Do not pretend to know exact pricing.
 4. If asked about pricing, say pricing depends on scope, tools, assets, coverage, and compliance requirements.
-5. If the visitor seems like a lead, ask for their name, company, email, phone number, and requirement.
+5. If the visitor seems like a lead, ask for name, company, email, phone number, and requirement.
 6. Do not give hacking, malware, phishing, exploitation, or offensive cybersecurity instructions.
 7. If asked something unrelated, politely redirect to SOCroom's services.
 8. Keep answers under 120 words unless the user asks for detail.
-
-Lead capture style:
-When appropriate, say:
-"Based on this, it may be worth doing a quick SOC readiness assessment. Please share your name, company, email, phone number, and what you’re looking for, and the SOCroom team can get in touch."
 `;
 
     const conversationText = conversation
@@ -92,11 +88,12 @@ Answer as SOCroom's AI assistant:
 `;
 
     const geminiResponse = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + apiKey,
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
       {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          "X-goog-api-key": apiKey
         },
         body: JSON.stringify({
           contents: [
@@ -119,10 +116,15 @@ Answer as SOCroom's AI assistant:
     const data = await geminiResponse.json();
 
     if (!geminiResponse.ok) {
-      console.error("Gemini API error:", data);
+      console.error("Gemini API error:", JSON.stringify(data, null, 2));
+
+      const realError =
+        data?.error?.message ||
+        data?.error?.status ||
+        "Unknown Gemini API error.";
 
       return res.status(500).json({
-        error: "Gemini API error. Please try again later."
+        error: "Gemini says: " + realError
       });
     }
 
