@@ -3,7 +3,7 @@ export default async function handler(req, res) {
     "https://socroom.com",
     "https://www.socroom.com"
   ];
- 
+
   const origin = req.headers.origin;
 
   if (allowedOrigins.includes(origin)) {
@@ -32,15 +32,15 @@ export default async function handler(req, res) {
       });
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.GROQ_API_KEY;
 
     if (!apiKey) {
       return res.status(500).json({
-        error: "Gemini API key is not configured."
+        error: "Groq API key is not configured."
       });
     }
 
-    const socroomKnowledge = `
+    const systemPrompt = `
 You are SOCroom's AI assistant.
 
 SOCroom provides cybersecurity operations services, including:
@@ -65,71 +65,67 @@ Your job:
 5. If the visitor seems like a lead, ask for name, company, email, phone number, and requirement.
 6. Do not give hacking, malware, phishing, exploitation, or offensive cybersecurity instructions.
 7. If asked something unrelated, politely redirect to SOCroom's services.
-8. Keep answers under 120 words unless the user asks for detail.
+8. Keep answers under 120 words unless the visitor asks for detail.
+
+Lead capture style:
+When appropriate, say:
+"Based on this, it may be worth doing a quick SOC readiness assessment. Please share your name, company, email, phone number, and what you’re looking for, and the SOCroom team can get in touch."
 `;
 
-    const conversationText = conversation
-      .map((item) => {
-        const role = item.role === "assistant" ? "Assistant" : "Visitor";
-        return `${role}: ${item.content}`;
-      })
-      .join("\n");
+    const safeConversation = conversation
+      .slice(-8)
+      .filter((item) => item && item.content)
+      .map((item) => ({
+        role: item.role === "assistant" ? "assistant" : "user",
+        content: String(item.content).slice(0, 2000)
+      }));
 
-    const prompt = `
-${socroomKnowledge}
+    const messages = [
+      {
+        role: "system",
+        content: systemPrompt
+      },
+      ...safeConversation,
+      {
+        role: "user",
+        content: message
+      }
+    ];
 
-Recent conversation:
-${conversationText}
-
-Visitor's latest question:
-${message}
-
-Answer as SOCroom's AI assistant:
-`;
-
-    const geminiResponse = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent",
+    const groqResponse = await fetch(
+      "https://api.groq.com/openai/v1/chat/completions",
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-goog-api-key": apiKey
+          "Authorization": "Bearer " + apiKey
         },
         body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                {
-                  text: prompt
-                }
-              ]
-            }
-          ],
-          generationConfig: {
-            temperature: 0.3,
-            maxOutputTokens: 500
-          }
+          model: "llama-3.1-8b-instant",
+          messages: messages,
+          temperature: 0.3,
+          max_tokens: 500
         })
       }
     );
 
-    const data = await geminiResponse.json();
+    const data = await groqResponse.json();
 
-    if (!geminiResponse.ok) {
-      console.error("Gemini API error:", JSON.stringify(data, null, 2));
+    if (!groqResponse.ok) {
+      console.error("Groq API error:", JSON.stringify(data, null, 2));
 
       const realError =
         data?.error?.message ||
-        data?.error?.status ||
-        "Unknown Gemini API error.";
+        data?.error?.type ||
+        "Unknown Groq API error.";
 
       return res.status(500).json({
-        error: "Gemini says: " + realError
+        error: "Groq says: " + realError
       });
     }
 
     const reply =
-      data?.candidates?.[0]?.content?.parts?.[0]?.text ||
+      data?.choices?.[0]?.message?.content ||
       "Sorry, I could not generate a response.";
 
     return res.status(200).json({
