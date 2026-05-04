@@ -3,7 +3,7 @@ export default async function handler(req, res) {
     "https://socroom.com",
     "https://www.socroom.com"
   ];
-
+ 
   const origin = req.headers.origin;
 
   if (allowedOrigins.includes(origin)) {
