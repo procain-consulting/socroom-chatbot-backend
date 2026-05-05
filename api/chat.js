@@ -1,3 +1,4 @@
+// added teams webhook env
 export default async function handler(req, res) {
   const allowedOrigins = [
     "https://socroom.com",
